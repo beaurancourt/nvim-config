@@ -108,6 +108,131 @@ local plugins = {
             require('leap').add_default_mappings()
         end
     },
+
+    -- Debug Adapter Protocol
+    { "mfussenegger/nvim-dap" },
+
+    -- Scala LSP support
+    {
+        "scalameta/nvim-metals",
+        ft = { "scala", "sbt", "java" },
+        opts = function()
+            local metals_config = require("metals").bare_config()
+
+            -- Example of settings
+            metals_config.settings = {
+                showImplicitArguments = true,
+                excludedPackages = { "akka.actor.typed.javadsl", "com.github.swagger.akka.javadsl" },
+            }
+
+            -- *READ THIS*
+            -- I *highly* recommend setting statusBarProvider to either "off" or "on"
+            --
+            -- "off" will enable LSP progress notifications by Metals and you'll need
+            -- to ensure you have a plugin like fidget.nvim installed to handle them.
+            --
+            -- "on" will enable the custom Metals status extension and you *have* to have
+            -- a have settings to capture this in your statusline or else you'll not see
+            -- any messages from metals. There is more info in the help docs about this
+            metals_config.init_options.statusBarProvider = "off"
+
+            -- Use default LSP capabilities since we're using blink.cmp
+            metals_config.capabilities = vim.lsp.protocol.make_client_capabilities()
+
+            metals_config.on_attach = function(client, bufnr)
+                require("metals").setup_dap()
+
+                -- Helper function for keymaps
+                local function map(mode, lhs, rhs, opts)
+                    opts = opts or {}
+                    opts.buffer = bufnr
+                    vim.keymap.set(mode, lhs, rhs, opts)
+                end
+
+                -- LSP mappings
+                map("n", "gD", vim.lsp.buf.definition)
+                map("n", "K", vim.lsp.buf.hover)
+                map("n", "gi", vim.lsp.buf.implementation)
+                map("n", "gr", vim.lsp.buf.references)
+                map("n", "gds", vim.lsp.buf.document_symbol)
+                map("n", "gws", vim.lsp.buf.workspace_symbol)
+                map("n", "<leader>cl", vim.lsp.codelens.run)
+                map("n", "<leader>sh", vim.lsp.buf.signature_help)
+                map("n", "<leader>rn", vim.lsp.buf.rename)
+                map("n", "<leader>f", vim.lsp.buf.format)
+                map("n", "<leader>ca", vim.lsp.buf.code_action)
+
+                map("n", "<leader>ws", function()
+                    require("metals").hover_worksheet()
+                end)
+
+                -- all workspace diagnostics
+                map("n", "<leader>aa", vim.diagnostic.setqflist)
+
+                -- all workspace errors
+                map("n", "<leader>ae", function()
+                    vim.diagnostic.setqflist({ severity = "E" })
+                end)
+
+                -- all workspace warnings
+                map("n", "<leader>aw", function()
+                    vim.diagnostic.setqflist({ severity = "W" })
+                end)
+
+                -- buffer diagnostics only
+                map("n", "<leader>d", vim.diagnostic.setloclist)
+
+                map("n", "[c", function()
+                    vim.diagnostic.goto_prev({ wrap = false })
+                end)
+
+                map("n", "]c", function()
+                    vim.diagnostic.goto_next({ wrap = false })
+                end)
+
+                -- DAP mappings
+                map("n", "<leader>dc", function()
+                    require("dap").continue()
+                end)
+
+                map("n", "<leader>dr", function()
+                    require("dap").repl.toggle()
+                end)
+
+                map("n", "<leader>dK", function()
+                    require("dap.ui.widgets").hover()
+                end)
+
+                map("n", "<leader>dt", function()
+                    require("dap").toggle_breakpoint()
+                end)
+
+                map("n", "<leader>dso", function()
+                    require("dap").step_over()
+                end)
+
+                map("n", "<leader>dsi", function()
+                    require("dap").step_into()
+                end)
+
+                map("n", "<leader>dl", function()
+                    require("dap").run_last()
+                end)
+            end
+
+            return metals_config
+        end,
+        config = function(self, metals_config)
+            local nvim_metals_group = vim.api.nvim_create_augroup("nvim-metals", { clear = true })
+            vim.api.nvim_create_autocmd("FileType", {
+                pattern = self.ft,
+                callback = function()
+                    require("metals").initialize_or_attach(metals_config)
+                end,
+                group = nvim_metals_group,
+            })
+        end
+    }
 }
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -135,6 +260,8 @@ require("nvim-treesitter.configs").setup({
         "python",
         "rust",
         "go",
+        "java",
+        "scala",
         -- etc!
     },
     sync_install = false,
@@ -152,7 +279,13 @@ require("mason-lspconfig").setup({
         "eslint",
         "ruff",
         "rust_analyzer",
+        "jdtls",
         -- etc!
+    },
+    handlers = {
+        function(server_name)
+            require("lspconfig")[server_name].setup{}
+        end,
     },
 })
 
@@ -164,6 +297,8 @@ require("conform").setup({
         json = { "prettierd" },
         solidity = { "prettierd" },
         go = { "gofmt" },
+        java = { "google-java-format" },
+        scala = { "scalafmt" },
         -- etc
     },
 })
@@ -199,7 +334,12 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 vim.keymap.set("n", "<leader>fo", require('conform').format)
 
 local tele_builtin = require("telescope.builtin")
-vim.keymap.set("n", "<C-p>", tele_builtin.git_files, {})
+vim.keymap.set("n", "<C-p>", function()
+    local ok = pcall(tele_builtin.git_files, {})
+    if not ok then
+        tele_builtin.find_files({})
+    end
+end, {})
 vim.keymap.set("n", "<leader>fa", tele_builtin.find_files, {})
 vim.keymap.set("n", "<leader>fg", tele_builtin.live_grep, {})
 vim.keymap.set("n", "<C-b>", tele_builtin.buffers, {})
