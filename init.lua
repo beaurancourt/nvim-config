@@ -250,7 +250,11 @@ vim.opt.rtp:prepend(lazypath)
 require("lazy").setup(plugins)
 
 vim.cmd.colorscheme("gruvbox") -- activate the theme
-require("telescope").setup()   -- command menu
+require("telescope").setup({
+    defaults = {
+        layout_strategy = "vertical"
+    }
+})   -- command menu
 
 vim.keymap.set({ 'n', 'x', 'o' }, 'S', '<Plug>(leap-backward)')
 
