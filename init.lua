@@ -46,7 +46,7 @@ vim.opt.splitbelow = true
 -- LSP
 vim.lsp.inlay_hint.enable(true)
 
-vim.opt.tags = "./.tags;$HOME"
+vim.opt.tags = ".git/tags;,.git/tags;$HOME"
 
 local plugins = {
     { "nvim-lua/plenary.nvim" }, -- used by other plugins
@@ -75,6 +75,8 @@ local plugins = {
 
     { "nvim-treesitter/nvim-treesitter-context" },
     { "tpope/vim-sleuth" },
+    { "tpope/vim-fugitive" },
+    { "tpope/vim-rhubarb" },
 
     -- Autocomplete engine (LSP, snippets etc)
     -- see keymap:
